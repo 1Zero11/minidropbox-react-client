@@ -6,6 +6,7 @@ import React from 'react';
 import { Button } from 'react-bootstrap';
 import axios from 'axios';
 import ConvertSizeToString from './SizeFormatter';
+import FileManager from './FileManager';
 
 class FileTable extends React.Component {
   constructor(props) {
@@ -15,76 +16,34 @@ class FileTable extends React.Component {
       isLoaded: false,
       selectedFile: null,
     };
+    this.FileManager = new FileManager();
   }
 
-  initList() {
-    fetch('https://localhost:7146/api/file')
-      .then(response => response.json())
-      .then(response => {
-        console.log(response);
-        this.setState({
-          items: response,
-          isLoaded: true,
-
-        });
-      })
-      .catch(err => console.error(err));
+  async initList() {
+    let list = await this.FileManager.getFileList();
+    
+    console.log(list);
+    this.setState({
+      items: list,
+      isLoaded: true,
+    });
   }
 
-  async downloadFile(item) {
-    const res = await fetch('https://localhost:7146/api/file/' + item.id);
-
-    const blob = await res.blob();
-    const newBlob = new Blob([blob]);
-
-    const blobUrl = window.URL.createObjectURL(newBlob);
-
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.setAttribute('download', `${item.name}`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-
-    // clean up Url
-    window.URL.revokeObjectURL(blobUrl);
+  async onDownloadButtonClick(item) {
+    await this.FileManager.downloadFile(item);
   }
   
-  deleteFile(item) {
-    fetch('https://localhost:7146/api/file/' + item.id, {
-      method: 'DELETE',
-    })
-      .then(response => {
-        this.initList();
-      })
-      .catch(err => console.error(err));
+  async onDeleteButtonClick(item) {
+    await this.FileManager.deleteFile(item);
+    this.initList();
   }
 
 
-  onFileUpload = () => {
-    let url = 'https://localhost:7146/api/file';
-    // Create an object of formData 
-    const formData = new FormData();
-
-    // Update the formData object 
-    formData.append(
-      'files',
-      this.state.selectedFile
-    );
-
-    console.log(this.state.selectedFile);
-    
-    axios.post('https://localhost:7146/api/file', formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
-      }
-    ).then(response => {
-      this.initList();
-    }).catch((error) => {
-      console.log(error);
-    });
+  onFileUpload = async () => {
+    let file = this.state.selectedFile;
+    console.log(file)
+    await this.FileManager.uploadFile(file);
+    this.initList();
   }; 
 
   onFileChange = event => {
@@ -106,9 +65,10 @@ class FileTable extends React.Component {
         >
           <thead>
             <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Download</th>
+                <th>#</th>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Download</th>
                 <th>Delete</th>
             </tr>
           </thead>
@@ -117,13 +77,14 @@ class FileTable extends React.Component {
               <tr key={item.id}>
                 <td>{item.id}</td>
                 <td>{item.name}</td>
+                <td>{ConvertSizeToString(item.size)}</td>
                 <td>
-                  <Button onClick={() => { this.downloadFile(item)}}>
+                  <Button onClick={() => { this.onDownloadButtonClick(item)}}>
                     Download
                   </Button>
                 </td>
                 <td>
-                  <Button onClick={() => { this.deleteFile(item) }}>
+                  <Button onClick={() => { this.onDeleteButtonClick(item) }}>
                     Delete
                   </Button>
                 </td>
